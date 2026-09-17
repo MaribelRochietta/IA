@@ -1,0 +1,90 @@
+package com.yoprogramo.busquedaprimeromejor;
+import java.util.HashSet;
+import java.util.PriorityQueue;
+import java.util.Set;
+
+public class BusquedaPrimeroMejor {
+
+  
+    // Clase que representa una posición en la horizontal H
+    static class Posicion implements Comparable<Posicion> {
+        double coordenada;
+        double heuristica; // Estimación de la distancia al objetivo A
+
+        public Posicion(double coordenada, double heuristica) {
+            this.coordenada = coordenada;
+            this.heuristica = heuristica;
+        }
+
+        // Ordena la cola de prioridad: la de menor heurística va primero
+        @Override
+        public int compareTo(Posicion otra) {
+            return Double.compare(this.heuristica, otra.heuristica);
+        }
+    }
+
+    
+    public static double leerSensorHeuristico(double coordenadaActual, double puntoA) {
+        return Math.abs(coordenadaActual - puntoA); 
+    }
+
+    // Determina si el sensor detecta que ya se llegó al punto A
+    public static boolean objetivoEncontrado(double heuristica) {
+        double tolerancia = 0.001; 
+        return heuristica < tolerancia;
+    }
+
+    public static void buscarPrimeroElMejor(double puntoB, double horizontalH, double puntoAReal) {
+        // Cola de prioridad que siempre procesa la posición con MEJOR (es decir, la menor) heurística
+        PriorityQueue<Posicion> colaPrioridad = new PriorityQueue<>();
+        
+        // Registro para evitar que el robot vuelva a pasar por coordenadas ya evaluadas
+        Set<Double> visitados = new HashSet<>();
+
+        // Inicializar en el punto B
+        double hInicial = leerSensorHeuristico(puntoB, puntoAReal);
+        colaPrioridad.add(new Posicion(puntoB, hInicial));
+
+        System.out.println("Iniciando Búsqueda Primero el Mejor desde: " + puntoB);
+        System.out.println("-------------------------------------------------------");
+
+        while (!colaPrioridad.isEmpty()) {
+            // El autómata se mueve físicamente a la posición con la mejor heurística disponible
+            Posicion actual = colaPrioridad.poll();
+            
+            // Redondear para evitar problemas decimales en los visitados
+            double coordRedondeada = Math.round(actual.coordenada * 1000.0) / 1000.0;
+            if (visitados.contains(coordRedondeada)) continue;
+            visitados.add(coordRedondeada);
+
+            System.out.printf("Moviendo a coordenada: %.3f | Valor del sensor (Heurística): %.3f\n", 
+                    actual.coordenada, actual.heuristica);
+
+            // Verificar si la posición actual es el objetivo A
+            if (objetivoEncontrado(actual.heuristica)) {
+                System.out.printf("\n¡ÉXITO! Objetivo A encontrado en la posición: %.3f\n", actual.coordenada);
+                return;
+            }
+
+            // --- FASE DE EXPLORACIÓN (Generar vecinos inmediatos) ---
+            // Derecha
+            double coordDerecha = actual.coordenada + horizontalH;
+            double hDerecha = leerSensorHeuristico(coordDerecha, puntoAReal);
+            colaPrioridad.add(new Posicion(coordDerecha, hDerecha));
+
+            // Izquierda
+            double coordIzquierda = actual.coordenada - horizontalH;
+            double hIzquierda = leerSensorHeuristico(coordIzquierda, puntoAReal);
+            colaPrioridad.add(new Posicion(coordIzquierda, hIzquierda));
+        }
+
+    }
+
+    public static void main(String[] args) {
+        double puntoB = 10.0;       // Inicio del autómata
+        double horizontalH = 0.1;        // Avance por paso
+        double puntoAReal = 9.5;   // El punto correcto 
+
+        buscarPrimeroElMejor(puntoB, horizontalH, puntoAReal);
+    }
+}
