@@ -1,0 +1,60 @@
+package com.yoprogramo.busquedaexhaustivaanchura;
+
+public class BusquedaExhaustivaAnchura {
+
+   
+    // Retorna 'true' si la posición actual coincide con el punto de montaje A
+    public static boolean palparSuperficie(double posicionActual, double puntoA) {
+        double tolerancia = 0.001; // Precisión milimétrica
+        return Math.abs(posicionActual - puntoA) < tolerancia;
+    }
+
+    public static void buscarPuntoMontaje(double puntoB, double horizontalH, double puntoAReal) {
+        System.out.println("Iniciando búsqueda desde el punto B: " + puntoB);
+        System.out.println("Incremento de precisión H: " + horizontalH);
+        System.out.println("----------------------------------------------");
+
+        // Se pregunta si está en el punto exacto
+        if (palparSuperficie(puntoB, puntoAReal)) {
+            System.out.println("¡Punto A encontrado inmediatamente en la posición inicial B!");
+            return;
+        }
+
+        int paso = 1;
+        boolean encontrado = false;
+        double posicionActual = puntoB;
+
+        // Búsqueda exhaustiva en ambos sentidos (BFS Unidimensional)
+        while (!encontrado) {
+            // Explorar hacia la derecha
+            posicionActual = puntoB + (paso * horizontalH);
+            System.out.printf("B %d (Derecha) -> Moviendo a posición: %.3f. Palpando... \n", (paso * 2 - 1), posicionActual);
+            
+            if (palparSuperficie(posicionActual, puntoAReal)) {
+                System.out.printf("\n¡ÉXITO! Punto A identificado en la posición: %.3f\n", posicionActual);
+                encontrado = true;
+                break;
+            }
+
+            // Explorar hacia la izquierda
+            posicionActual = puntoB - (paso * horizontalH);
+            System.out.printf("B %d (Izquierda) -> Moviendo a posición: %.3f. Palpando... \n", (paso * 2), posicionActual);
+            
+            if (palparSuperficie(posicionActual, puntoAReal)) {
+                System.out.printf("\n¡ÉXITO! Punto A identificado en la posición: %.3f\n", posicionActual);
+                encontrado = true;
+                break;
+            }
+
+            paso++; 
+        }
+    }
+
+    public static void main(String[] args) {
+        double puntoB = 10.0;       // Posición inicial de referencia
+        double horizontalH = 0.1;        // Incremento de avance
+        double puntoAReal = 9.50;    // El punto correcto de montaje
+        buscarPuntoMontaje(puntoB, horizontalH, puntoAReal);
+    
+    }
+}
