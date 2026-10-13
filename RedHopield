@@ -1,0 +1,195 @@
+package com.yoprogramo.hopfield;
+
+import java.util.Arrays;
+
+public class RedHopfield{
+    private final int dimension;
+    private final double[][] pesos; 
+    private final int[] neuronas;
+
+    public RedHopfield(int dimension) {
+        this.dimension = dimension;
+        this.pesos = new double[dimension][dimension];
+        this.neuronas = new int[dimension];
+    }
+
+   
+    //REGLA DE HEBB
+     
+    public void entrenarHebb(int[][] patrones) {
+        // Reiniciar pesos
+        for (double[] fila : pesos) Arrays.fill(fila, 0.0);
+
+        for (int[] patron : patrones) {
+            for (int i = 0; i < dimension; i++) {
+                for (int j = 0; j < dimension; j++) {
+                    if (i != j) {
+                        pesos[i][j] += patron[i] * patron[j];
+                    }
+                }
+            }
+        }
+    }
+
+  
+     //REGLA DE LA MATRIZ PSEUDOINVERSA
+     //Resuelve las limitaciones de Hebb cuando los patrones no son perfectamente ortogonales.
+     
+    public void entrenarPseudoinversa(int[][] patrones) {
+        for (double[] fila : pesos) Arrays.fill(fila, 0.0);
+        int p = patrones.length;
+
+        double[][] X = new double[dimension][p];
+        for (int i = 0; i < dimension; i++) {
+            for (int mu = 0; mu < p; mu++) {
+                X[i][mu] = patrones[mu][i];
+            }
+        }
+
+        // Calcular la pseudoinversa simplificada mediante la matriz de correlación (X^T * X)
+        double[][] C = new double[p][p];
+        for (int i = 0; i < p; i++) {
+            for (int j = 0; j < p; j++) {
+                for (int k = 0; k < dimension; k++) {
+                    C[i][j] += X[k][i] * X[k][j];
+                }
+            }
+        }
+
+        // Invertir la matriz C de tamaño p x p (como p es pequeño, ej. 2 o 3, usamos inversión simple)
+        double[][] C_inv = invertirMatrizPequeña(C);
+
+        // Calcular Matriz de Pesos: W = X * C_inv * X^T
+        for (int i = 0; i < dimension; i++) {
+            for (int j = 0; j < dimension; j++) {
+                if (i != j) {
+                    for (int k = 0; k < p; k++) {
+                        for (int l = 0; l < p; l++) {
+                            pesos[i][j] += X[i][k] * C_inv[k][l] * X[j][l];
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    
+    //Recuperación con REPRESENTACIÓN DE PASOS SUCESIVOS
+    public int[] recuperarPasoAPaso(int[] entrada, int maxIteraciones, int[] indicesReferencia) {
+        System.arraycopy(entrada, 0, neuronas, 0, dimension);
+        boolean cambio;
+        int iteracion = 0;
+
+        System.out.println("--- ESTADO INICIAL ---");
+        imprimirMatriz10x10(neuronas);
+
+        
+            cambio = false;
+            // Forzar que los elementos de referencia mantengan su posición inalterable
+            if (indicesReferencia != null) {
+                for (int idx : indicesReferencia) {
+                    neuronas[idx] = 1; // Mantenemos encendido el punto de referencia
+                }
+            }
+
+            // Actualización asíncrona neurona por neurona
+            for (int i = 0; i < dimension; i++) {
+                // Saltar actualización si es un elemento de referencia inalterable
+                if (esReferencia(i, indicesReferencia)) continue;
+
+                double suma = 0;
+                for (int j = 0; j < dimension; j++) {
+                    suma += pesos[i][j] * neuronas[j];
+                }
+
+                int nuevoEstado = (suma >= 0) ? 1 : -1;
+                if (nuevoEstado != neuronas[i]) {
+                    neuronas[i] = nuevoEstado;
+                    cambio = true;
+                }
+            }
+
+            iteracion++;
+            System.out.println("--- AJUSTE ---");
+            imprimirMatriz10x10(neuronas);
+
+
+        return Arrays.copyOf(neuronas, dimension);
+    }
+
+    private boolean esReferencia(int idx, int[] indicesReferencia) {
+        if (indicesReferencia == null) return false;
+        for (int ref : indicesReferencia) {
+            if (ref == idx) return true;
+        }
+        return false;
+    }
+
+    public static void imprimirMatriz10x10(int[] patron) {
+        for (int i = 0; i < 10; i++) {
+            for (int j = 0; j < 10; j++) {
+                System.out.print((patron[i * 10 + j] == 1) ? "██ " : ".  ");
+            }
+            System.out.println();
+        }
+        System.out.println();
+    }
+
+    // Inversión básica de matrices para soporte analítico (p x p)
+    private double[][] invertirMatrizPequeña(double[][] m) {
+        int n = m.length;
+        if (n == 2) {
+            double det = m[0][0] * m[1][1] - m[0][1] * m[1][0];
+            return new double[][]{{m[1][1]/det, -m[0][1]/det}, {-m[1][0]/det, m[0][0]/det}};
+        }
+        // Identidad por defecto si es 1 patrón
+        return new double[][]{{1.0 / m[0][0]}};
+    }
+
+    public static void main(String[] args) {
+        int dimension = 100;
+        RedHopfield red = new RedHopfield(dimension);
+
+        // Definir ELEMENTO DE REFERENCIA INALTERABLE 
+        int[] indicesReferencia = {2,11};
+
+        // Genera Patrón
+        int[] cuadradoRedondo = new int[dimension];
+        Arrays.fill(cuadradoRedondo, -1);
+        
+        // Colocar la referencia fija en el patrón memorizado
+        for(int idx : indicesReferencia) cuadradoRedondo[idx] = 1;
+
+        // Dibujar el aro/cuadrado redondeado
+        for (int f = 0; f < 10; f++) {
+            for (int c = 0; c < 10; c++) {
+                int index = f * 10 + c;
+                if ((f == 0 || f == 9) && (c >= 2 && c <= 7)) cuadradoRedondo[index] = 1;
+                if ((f == 1 || f == 8) && (c == 1 || c == 8)) cuadradoRedondo[index] = 1;
+                if ((f >= 2 && f <= 7) && (c == 0 || c == 9)) cuadradoRedondo[index] = 1;
+            }
+        }
+
+        // Ejecutar entrenamiento por regla Pseudoinversa 
+        red.entrenarPseudoinversa(new int[][]{cuadradoRedondo});
+
+        // entrada dañada para la prueba 
+        int[] entradaDañada = Arrays.copyOf(cuadradoRedondo, dimension);
+        for(int i = 40; i < 100; i++) {
+            if (!red.esReferencia(i, indicesReferencia)) {
+                entradaDañada[i] = -1; // Borramos completamente de la mitad para abajo
+                entradaDañada[0] = 1;
+                entradaDañada[1] = 1;
+                entradaDañada[90] = 1;
+
+            }
+        }
+
+        System.out.println("==============================================");
+        System.out.println(" INICIO DE EVALUACIÓN DE PASOS SUCESIVOS ");
+        System.out.println("==============================================\n");
+        
+        // Ejecuta y evalua la secuencia 
+        red.recuperarPasoAPaso(entradaDañada, 10, indicesReferencia);
+    }
+}
