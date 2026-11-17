@@ -1,0 +1,111 @@
+package com.yoprogramo.transformadahoughcirc;
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
+import java.awt.image.Raster;
+import java.io.File;
+import javax.imageio.ImageIO;
+
+public class TransformadaHoughCirc {
+
+
+    public static void main(String[] args) throws Exception {
+
+        int ancho = 200;
+        int alto = 200;
+
+        // Parámetros conocidos del problema
+        int radioConocidoR = 45; // Radio R del anillo "C" en píxeles
+
+        // Posición real simulada del block desplazado en la cinta transportadora
+        int centroRealX = 100;
+        int centroRealY = 120;
+
+        //Crear imagen simulada (fondo negro = 0) y dibujar el anillo "C" + ruido/otras piezas
+        BufferedImage imagen = new BufferedImage(ancho, alto, BufferedImage.TYPE_BYTE_GRAY);
+        Graphics2D g2d = imagen.createGraphics();
+        g2d.setColor(Color.BLACK);
+        g2d.fillRect(0, 0, ancho, alto);
+
+        g2d.setColor(Color.WHITE);
+        // Dibujar contorno del block desplazado (rectángulo que simula bordes de la pieza)
+        g2d.drawRect(centroRealX - 80, centroRealY - 70, 160, 140);
+        
+        // Dibujar el anillo prominente "C" centrado en (centroRealX, centroRealY)
+        // drawOval recibe la esquina superior izquierda (x - R, y - R) y el diámetro (2R, 2R)
+        g2d.drawOval(centroRealX - radioConocidoR, centroRealY - radioConocidoR, 
+                     radioConocidoR * 2, radioConocidoR * 2);
+        g2d.dispose();
+
+        // Extraer matriz de bordes (0 y 255)
+        int[][] bordes = new int[alto][ancho];
+        Raster raster = imagen.getRaster();
+        for (int y = 0; y < alto; y++) {
+            for (int x = 0; x < ancho; x++) {
+                bordes[y][x] = raster.getSample(x, y, 0);
+            }
+        }
+
+        //Inicializar el espacio acumulador 2D para posibles centros (x0, y0)
+        int[][] acumulador = new int[alto][ancho];
+
+        // Precalcular senos y cosenos (0 a 359 grados) para optimizar velocidad
+        double[] cosTabla = new double[360];
+        double[] sinTabla = new double[360];
+        for (int theta = 0; theta < 360; theta++) {
+            double rad = Math.toRadians(theta);
+            cosTabla[theta] = Math.cos(rad);
+            sinTabla[theta] = Math.sin(rad);
+        }
+
+        //Votación: Cada píxel de borde vota por los posibles centros (x0, y0) a distancia R
+        for (int y = 0; y < alto; y++) {
+            for (int x = 0; x < ancho; x++) {
+                if (bordes[y][x] > 0) {
+                    for (int theta = 0; theta < 360; theta++) {
+                        int x0 = (int) Math.round(x - radioConocidoR * cosTabla[theta]);
+                        int y0 = (int) Math.round(y - radioConocidoR * sinTabla[theta]);
+
+                        // Verificar que el centro votado caiga dentro de los límites de la imagen
+                        if (x0 >= 0 && x0 < ancho && y0 >= 0 && y0 < alto) {
+                            acumulador[y0][x0]++;
+                        }
+                    }
+                }
+            }
+        }
+
+        //Buscar el máximo global en el acumulador -> Centro "A"
+        int maxVotos = 0;
+        int centroDetectadoX = -1;
+        int centroDetectadoY = -1;
+
+        for (int y0 = 0; y0 < alto; y0++) {
+            for (int x0 = 0; x0 < ancho; x0++) {
+                if (acumulador[y0][x0] > maxVotos) {
+                    maxVotos = acumulador[y0][x0];
+                    centroDetectadoX = x0;
+                    centroDetectadoY = y0;
+                }
+            }
+        }
+
+        //Resultados en consola
+        System.out.println("=== DETECCIÓN DEL CENTRO 'A' DEL ANILLO 'C' ===");
+        System.out.println("Posición Real Simulada : (" + centroRealX + ", " + centroRealY + ")");
+        System.out.println("Centro 'A' Detectado   : (" + centroDetectadoX + ", " + centroDetectadoY + ")");
+        System.out.println("Votos en el pico máximo: " + maxVotos);
+
+        //Guardar imagen visualizando el centro "A" encontrado con una cruz roja
+        BufferedImage resultadoVisual = new BufferedImage(ancho, alto, BufferedImage.TYPE_INT_RGB);
+        Graphics2D gRes = resultadoVisual.createGraphics();
+        gRes.drawImage(imagen, 0, 0, null);
+        gRes.setColor(Color.RED);
+        gRes.drawLine(centroDetectadoX - 6, centroDetectadoY, centroDetectadoX + 6, centroDetectadoY);
+        gRes.drawLine(centroDetectadoX, centroDetectadoY - 6, centroDetectadoX, centroDetectadoY + 6);
+        gRes.dispose();
+
+        ImageIO.write(resultadoVisual, "png", new File("deteccion_centro_A.png"));
+    }
+}
+
